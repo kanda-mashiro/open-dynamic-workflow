@@ -1269,8 +1269,11 @@ mod tests {
         }
         let elapsed = t0.elapsed();
         eprintln!("400 bottom-scroll key+draw cycles took {elapsed:?}");
+        // Pre-fix this took 35.9s; locally it's ~0.5s. The bound leaves CI
+        // headroom (shared 2-core runners measured ~1.06s) while still failing
+        // hard on any reintroduced per-key re-wrap.
         assert!(
-            elapsed < std::time::Duration::from_secs(1),
+            elapsed < std::time::Duration::from_secs(3),
             "a wheel burst at the bottom must not freeze the UI: 400 key+draw \
              cycles took {elapsed:?}"
         );
