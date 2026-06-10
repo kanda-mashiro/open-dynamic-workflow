@@ -32,7 +32,7 @@ login (`codex exec "say hi"` must succeed).
 ### Fast path: prebuilt release (no Rust toolchain)
 
 ```bash
-# targets: x86_64-unknown-linux-gnu | aarch64-apple-darwin | x86_64-apple-darwin
+# targets: x86_64-unknown-linux-gnu | aarch64-apple-darwin
 TARGET=aarch64-apple-darwin
 TAG=$(curl -fsSL https://api.github.com/repos/kanda-mashiro/open-dynamic-workflow/releases/latest | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
 curl -fsSL -o cf.tar.gz "https://github.com/kanda-mashiro/open-dynamic-workflow/releases/download/$TAG/codex-flow-$TAG-$TARGET.tar.gz"
