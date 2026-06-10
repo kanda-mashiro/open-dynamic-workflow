@@ -15,9 +15,10 @@ use std::sync::Arc;
 
 use deno_core::error::ModuleLoaderError;
 use deno_core::{
-    extension, op2, resolve_import, JsRuntime, ModuleLoadOptions, ModuleLoadReferrer,
-    ModuleLoadResponse, ModuleLoader, ModuleSource, ModuleSourceCode, ModuleSpecifier, ModuleType,
-    OpState, PollEventLoopOptions, ResolutionKind, RuntimeOptions,
+    ascii_str_include, extension, op2, resolve_import, ExtensionFileSource, JsRuntime,
+    ModuleLoadOptions, ModuleLoadReferrer, ModuleLoadResponse, ModuleLoader, ModuleSource,
+    ModuleSourceCode, ModuleSpecifier, ModuleType, OpState, PollEventLoopOptions, ResolutionKind,
+    RuntimeOptions,
 };
 use deno_error::JsErrorBox;
 use serde::Deserialize;
@@ -353,6 +354,9 @@ extension!(
         op_budget_spent,
     ],
     esm_entry_point = "ext:codexflow/prelude.js",
+    // NOTE: this records an absolute CARGO_MANIFEST_DIR path to be read at
+    // RUNTIME; run_workflow overrides esm_files with the EMBEDDED prelude
+    // below — without that, a CI-built binary panics on any other machine.
     esm = [dir "src/js", "prelude.js"],
     // EngineState must be present in OpState BEFORE the esm_entry_point
     // (prelude.js) runs — it calls op_get_args() at module top level during
@@ -529,9 +533,22 @@ pub async fn run_workflow(
         workflow_path,
     });
 
+    // The prelude EMBEDDED at compile time. extension!'s file form records an
+    // absolute CARGO_MANIFEST_DIR path and loads it at RUNTIME, so a CI-built
+    // binary panicked on every other machine ("Failed to initialize a
+    // JsRuntime: No such file or directory" — found by v0.1.0's first external
+    // user). Overriding esm_files with an IncludedInBinary source makes the
+    // binary self-contained; ascii_str_include! also re-asserts 7-bit ASCII.
+    static EMBEDDED_PRELUDE: &[ExtensionFileSource] = &[ExtensionFileSource::new(
+        "ext:codexflow/prelude.js",
+        ascii_str_include!("js/prelude.js"),
+    )];
+    let mut ext = codexflow::init(engine_state);
+    ext.esm_files = std::borrow::Cow::Borrowed(EMBEDDED_PRELUDE);
+
     let mut runtime = JsRuntime::new(RuntimeOptions {
         module_loader: Some(loader),
-        extensions: vec![codexflow::init(engine_state)],
+        extensions: vec![ext],
         is_main: true,
         ..Default::default()
     });

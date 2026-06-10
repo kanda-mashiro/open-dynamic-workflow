@@ -21,3 +21,16 @@ jobs:
         run: cargo build --locked
       - name: Unit tests
         run: cargo test --lib --locked
+      # The binary must be SELF-CONTAINED: v0.1.0 recorded the build machine's
+      # source path for the embedded prelude and panicked at JsRuntime init on
+      # every other machine. Moving src/js away reproduces that exact failure
+      # mode, so this step fails if the embedding ever regresses.
+      - name: Portable-binary check (prelude embedded, not read from FS)
+        run: |
+          printf '#!/bin/sh\nprintf "%%s\\n" "{\\"type\\":\\"item.completed\\",\\"item\\":{\\"type\\":\\"agent_message\\",\\"text\\":\\"ok\\"}}"\n' > /tmp/fakecodex
+          chmod +x /tmp/fakecodex
+          cp target/debug/codex-flow /tmp/cf-portable
+          mv src/js /tmp/js-moved
+          CODEX_FLOW_CODEX_BIN=/tmp/fakecodex CODEX_FLOW_MAX_ATTEMPTS=1 CODEX_FLOW_RUNS_DIR=/tmp/cfruns \
+            /tmp/cf-portable examples/hello.workflow.js | grep '^RESULT'
+          mv /tmp/js-moved src/js
